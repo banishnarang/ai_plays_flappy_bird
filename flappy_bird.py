@@ -3,6 +3,7 @@ import neat
 import time
 import os
 import random   # For randomly placing the height of the tubes
+pygame.font.init()
 
 # Set up window size
 WIN_WIDTH = 500
@@ -16,6 +17,7 @@ PIPE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join('images', 'pi
 BASE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join('images', 'base.png')))
 BG_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join('images', 'bg.png')))
 
+STAT_FONT = pygame.font.SysFont('comicsans', 50)
 
 # Represents the bird object moving - Bird Class
 class Bird:
@@ -154,7 +156,7 @@ class Pipe:
 
     def move(self):
         # Move pipe to the left based on velocity
-        self.x = self.VEL
+        self.x -= self.VEL
 
     def draw(self, win):
         win.blit(self.PIPE_TOP, (self.x, self.top))
@@ -207,16 +209,34 @@ class Base:
         win.blit(self.IMG, (self.x1, self.y))
         win.blit(self.IMG, (self.x2, self.y))
 
-def draw_window(win, bird):
+
+def draw_window(win, bird, pipes, base, score):
     win.blit(BG_IMG, (0,0))
+
+    # Draw all pipes
+    for pipe in pipes:
+        pipe.draw(win)
+
+    text = STAT_FONT.render('Score: ' + str(score), 1, (255, 255, 255))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
+
+    # Draw base
+    base.draw(win)
+
+    # Draw bird
     bird.draw(win)
+
     pygame.display.update()
 
 
 def main():
-    # Initialize bird object with starting position
-    bird = Bird(200, 200)
+    # Initialize bird, base, and pipe object with starting position
+    bird = Bird(230, 350)
+    base = Base(730)
+    pipes = [Pipe(700)]
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+
+    score = 0  # player score
 
     # Create clock object to set consistent frame rate
     clock = pygame.time.Clock()
@@ -227,6 +247,7 @@ def main():
     while run:
         # At most 30 ticks every seconds
         clock.tick(30)
+
         # Basic pygame event loop, keeps track of whenever something happens, user clicks mouse etc.
         for event in pygame.event.get():
             # if user clicks the cross ui
@@ -234,11 +255,42 @@ def main():
                 # loop breaks
                 run = False
 
-        # call move
-        bird.move()
+        rem = []    # Pipes to remove list
+        add_pipe = False
+        # Move pipes
+        for pipe in pipes:
+            # Check for collision with the pipes
+            if pipe.collide(bird):
+                pass
+
+            # Check the position of the pipe, if the pipe is completely off the screen, we remove the pipe
+            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
+                rem.append(pipe)    # Append to this list, equivalent to removing it
+
+            # Check if bird has passed the pipe, set add_pipe flag to be true
+            if not pipe.passed and pipe.x < bird.x:
+                pipe.passed = True
+                add_pipe = True
+
+            pipe.move()
+
+        if add_pipe:
+            score += 1
+            pipes.append(Pipe(600))
+
+        # Remove the pipe that went off the screen
+        for r in rem:
+            pipes.remove(r)
+
+        # Check if bird has hit the ground
+        if bird.y + bird.img.get_height() >= 750:
+            pass
+
+        # Move base
+        base.move()
 
         # call draw_window to create one
-        draw_window(win, bird)
+        draw_window(win, bird, pipes, base, score)
 
     pygame.quit()
     quit()
