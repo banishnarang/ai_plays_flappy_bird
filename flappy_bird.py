@@ -128,6 +128,85 @@ class Bird:
         return pygame.mask.from_surface(self.img)
 
 
+class Pipe:
+    GAP = 200
+
+    # The bird doesn't move but all the other objects in the environment do, therefore, we need velocity
+    VEL = 5
+
+    def __init__(self, x):
+        self.x = x
+        self.height = 0
+
+        self.top = 0
+        self.bottom = 0
+        self.PIPE_TOP = pygame.transform.flip(PIPE_IMG, False, True)    # For pipes going from top to bottom, we flip
+        self.PIPE_BOTTOM = PIPE_IMG
+
+        self.passed = False    # If the bird has already passed across the pipe
+        self.set_height()
+
+    def set_height(self):
+        # Get a random number for where the top of our pipe should be
+        self.height = random.randrange(50, 450)
+        self.top = self.height - self.PIPE_TOP.get_height()
+        self.bottom = self.height + self.GAP
+
+    def move(self):
+        # Move pipe to the left based on velocity
+        self.x = self.VEL
+
+    def draw(self, win):
+        win.blit(self.PIPE_TOP, (self.x, self.top))
+        win.blit(self.PIPE_BOTTOM, (self.x, self.bottom))
+
+    def collide(self, bird):
+        bird_mask = bird.get_mask()
+
+        # Create a mask for the top and bottom pipe
+        top_mask = pygame.mask.from_surface(self.PIPE_TOP)
+        bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
+
+        # Calculate offset: how far along are the masks from each other
+        top_offset = (self.x - bird.x, self.top - round(bird.y))    # Offset from the bird to top mask
+        bottom_offset = (self.x - bird.x, self.bottom - round(bird.y))    # Offset from the bird to bottom mask
+
+        # Point of collision, first point of overlap
+        b_point = bird_mask.overlap(bottom_mask, bottom_offset)
+        t_point = bird_mask.overlap(top_mask, top_offset)
+
+        if t_point or b_point:
+            return True
+
+        return False
+
+
+class Base:
+    VEL = 5    # Same as pipe
+    WIDTH = BASE_IMG.get_width()    # How wide one of these image are
+    IMG = BASE_IMG
+
+    def __init__(self, y):
+        # Since the x is going to be moving to the left, so we don't need to define that
+        self.y = y
+        self.x1 = 0
+        self.x2 = self.WIDTH
+
+    def move(self):
+        self.x1 -= self.VEL
+        self.x2 -= self.VEL
+
+        # Cycle images repeatedly to keep consistent flow of movement
+        if self.x1 + self.WIDTH < 0:
+            self.x1 = self.x2 + self.WIDTH
+
+        if self.x2 + self.WIDTH < 0:
+            self.x2 = self.x1 + self.WIDTH
+
+    def draw(self, win):
+        win.blit(self.IMG, (self.x1, self.y))
+        win.blit(self.IMG, (self.x2, self.y))
+
 def draw_window(win, bird):
     win.blit(BG_IMG, (0,0))
     bird.draw(win)
