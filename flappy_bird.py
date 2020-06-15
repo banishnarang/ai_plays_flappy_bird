@@ -3,11 +3,15 @@ import neat
 import time
 import os
 import random   # For randomly placing the height of the tubes
+import pickle
 pygame.font.init()
 
 # Set up window size
 WIN_WIDTH = 500
 WIN_HEIGHT = 800
+
+# Generation count
+gen = 0
 
 # Load Images (scale2x to increase size 2 times)
 BIRD_IMGS = [pygame.transform.scale2x(pygame.image.load(os.path.join('images', 'bird1.png'))),
@@ -18,6 +22,11 @@ BASE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join('images', 'ba
 BG_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join('images', 'bg.png')))
 
 STAT_FONT = pygame.font.SysFont('comicsans', 50)
+END_FONT = pygame.font.SysFont('comicsans', 70)
+DRAW_LINES = False
+
+WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+pygame.display.set_caption("Flappy Bird")
 
 # Represents the bird object moving - Bird Class
 class Bird:
@@ -131,12 +140,21 @@ class Bird:
 
 
 class Pipe:
+    """
+    represents a pipe object
+    """
     GAP = 200
 
     # The bird doesn't move but all the other objects in the environment do, therefore, we need velocity
     VEL = 5
 
     def __init__(self, x):
+        """
+        initialize pipe object
+        :param x: int
+        :param y: int
+        :return" None
+        """
         self.x = x
         self.height = 0
 
@@ -149,20 +167,38 @@ class Pipe:
         self.set_height()
 
     def set_height(self):
+        """
+        set the height of the pipe, from the top of the screen
+        :return: None
+        """
         # Get a random number for where the top of our pipe should be
         self.height = random.randrange(50, 450)
         self.top = self.height - self.PIPE_TOP.get_height()
         self.bottom = self.height + self.GAP
 
     def move(self):
+        """
+        move pipe based on vel
+        :return: None
+        """
         # Move pipe to the left based on velocity
         self.x -= self.VEL
 
     def draw(self, win):
+        """
+       draw both the top and bottom of the pipe
+       :param win: pygame window/surface
+       :return: None
+       """
         win.blit(self.PIPE_TOP, (self.x, self.top))
         win.blit(self.PIPE_BOTTOM, (self.x, self.bottom))
 
     def collide(self, bird):
+        """
+        returns if a point is colliding with the pipe
+        :param bird: Bird object
+        :return: Bool
+        """
         bird_mask = bird.get_mask()
 
         # Create a mask for the top and bottom pipe
@@ -184,17 +220,29 @@ class Pipe:
 
 
 class Base:
+    """
+    Represnts the moving floor of the game
+    """
     VEL = 5    # Same as pipe
     WIDTH = BASE_IMG.get_width()    # How wide one of these image are
     IMG = BASE_IMG
 
     def __init__(self, y):
+        """
+       Initialize the object
+       :param y: int
+       :return: None
+       """
         # Since the x is going to be moving to the left, so we don't need to define that
         self.y = y
         self.x1 = 0
         self.x2 = self.WIDTH
 
     def move(self):
+        """
+        move floor so it looks like its scrolling
+        :return: None
+        """
         self.x1 -= self.VEL
         self.x2 -= self.VEL
 
@@ -206,11 +254,26 @@ class Base:
             self.x2 = self.x1 + self.WIDTH
 
     def draw(self, win):
+        """
+       Draw the floor. This is two images that move together.
+       :param win: the pygame surface/window
+       :return: None
+       """
         win.blit(self.IMG, (self.x1, self.y))
         win.blit(self.IMG, (self.x2, self.y))
 
 
-def draw_window(win, birds, pipes, base, score):
+def draw_window(win, birds, pipes, base, score, gen, pipe_ind):
+    """
+   draws the windows for the main game loop
+   :param win: pygame window surface
+   :param bird: a Bird object
+   :param pipes: List of pipes
+   :param score: score of the game (int)
+   :param gen: current generation
+   :param pipe_ind: index of closest pipe
+   :return: None
+   """
     win.blit(BG_IMG, (0,0))
 
     # Draw all pipes
@@ -220,17 +283,43 @@ def draw_window(win, birds, pipes, base, score):
     text = STAT_FONT.render('Score: ' + str(score), 1, (255, 255, 255))
     win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
 
+    text = STAT_FONT.render('Gen: ' + str(gen), 1, (255, 255, 255))
+    win.blit(text, (10, 10))
+
     # Draw base
     base.draw(win)
 
     # Draw bird
     for bird in birds:
+        # draw lines from bird to pipe
+        if DRAW_LINES:
+            try:
+                pygame.draw.line(win, (255, 0, 0),
+                                 (bird.x + bird.img.get_width() / 2, bird.y + bird.img.get_height() / 2),
+                                 (pipes[pipe_ind].x + pipes[pipe_ind].PIPE_TOP.get_width() / 2, pipes[pipe_ind].height),
+                                 5)
+                pygame.draw.line(win, (255, 0, 0),
+                                 (bird.x + bird.img.get_width() / 2, bird.y + bird.img.get_height() / 2), (
+                                 pipes[pipe_ind].x + pipes[pipe_ind].PIPE_BOTTOM.get_width() / 2,
+                                 pipes[pipe_ind].bottom), 5)
+            except:
+                pass
+        # draw bird
         bird.draw(win)
 
     pygame.display.update()
 
 
 def main(genomes, config):
+    """
+   runs the simulation of the current population of
+   birds and sets their fitness based on the distance they
+   reach in the game.
+   """
+    global gen, WIN
+    win = WIN
+    gen += 1
+
     nets = []   # To keep track of NN
     ge = []    # To keep track of genome
     birds = []
@@ -354,10 +443,22 @@ def main(genomes, config):
         base.move()
 
         # call draw_window to create one
-        draw_window(win, birds, pipes, base, score)
+        draw_window(WIN, birds, pipes, base, score, gen-1, pipe_ind)
+
+        # break if score gets large enough
+        '''
+        if score > 20:
+            pickle.dump(nets[0], open('best.pickle', 'wb'))
+            break
+        '''
 
 
 def run(config_path):
+    """
+    runs the NEAT algorithm to train a neural network to play flappy bird.
+    :param config_file: location of config file
+    :return: None
+    """
     # Define all sub headings used in the config file
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet,
                                 neat.DefaultStagnation, config_path)
@@ -373,8 +474,17 @@ def run(config_path):
     # Set the fitness function that we are going to run for 50 generations
     winner = p.run(main, 50)
 
+    # Show final stats
+    print('\nBest Genome: \n{!s}'.format(winner))
+
+
+
 
 if __name__=="__main__":
+    # Determine path to configuration file. This path manipulation is
+    # here so that the script will run successfully regardless of the
+    # current working directory.
+
     # Path to directory we are currently in
     local_dir = os.path.dirname(__file__)
 
